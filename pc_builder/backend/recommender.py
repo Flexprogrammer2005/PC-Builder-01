@@ -1,6 +1,10 @@
 import re
-from pc_builder.backend.pricing import price_of
-from pc_builder.database.products import CATEGORIES, products_in
+try:
+    from pc_builder.backend.pricing import price_of
+    from pc_builder.database.products import CATEGORIES, products_in
+except ModuleNotFoundError:
+    from backend.pricing import price_of
+    from database.products import CATEGORIES, products_in
 
 def guess_use_cases(user_text):
     text = user_text.lower()
@@ -159,29 +163,20 @@ def calculate_build_score(parts, use_cases, total_price, min_budget, max_budget,
         score += wifi_card["wifi_rank"] * 0.25
     return score
 
-def find_best_pc(use_cases, min_budget, max_budget, preferences):
-    target_budget = (min_budget + max_budget) / 2
-    best_build = None
-    best_score = -10**9
-    processors = products_in("Processor")
-    processors.sort(
-        key=lambda processor: processor_fuzzy_score(
-            processor, use_cases, target_budget, preferences["cpu_priority"]
-        ),
-        reverse=True,
-    )
+def candidate_builds(processors, preferences, budget):
+    wifi_options = products_in("Wi-Fi Card") if preferences["include_wifi"] else [None]
+
     for processor in processors:
         for motherboard in products_in("Motherboard"):
             for ram in products_in("RAM"):
-                if not product_allowed(ram, preferences, max_budget):
+                if not product_allowed(ram, preferences, budget):
                     continue
                 for storage in products_in("ROM / Storage"):
-                    if not product_allowed(storage, preferences, max_budget):
+                    if not product_allowed(storage, preferences, budget):
                         continue
                     for graphics_card in products_in("Graphics Card"):
-                        if not product_allowed(graphics_card, preferences, max_budget):
+                        if not product_allowed(graphics_card, preferences, budget):
                             continue
-                        wifi_options = products_in("Wi-Fi Card") if preferences["include_wifi"] else [None]
                         for wifi_card in wifi_options:
                             for power_supply in products_in("Power Supply"):
                                 for cabinet in products_in("Cabinet"):
@@ -206,22 +201,29 @@ def find_best_pc(use_cases, min_budget, max_budget, preferences):
                                     ]
                                     if wifi_card is not None:
                                         parts.append(wifi_card)
-                                    total_price = sum(price_of(part) for part in parts)
-                                    if total_price > max_budget:
-                                        continue
-                                    score = calculate_build_score(
-                                        parts,
-                                        use_cases,
-                                        total_price,
-                                        min_budget,
-                                        max_budget,
-                                        preferences,
-                                    )
-                                    if total_price < min_budget:
-                                        score -= 20
-                                    if score > best_score:
-                                        best_score = score
-                                        best_build = {"parts": parts, "total_price": total_price}
+                                    yield parts, sum(price_of(part) for part in parts)
+
+def find_best_pc(use_cases, min_budget, max_budget, preferences):
+    target_budget = (min_budget + max_budget) / 2
+    best_build = None
+    best_score = -10**9
+    processors = products_in("Processor")
+    processors.sort(
+        key=lambda processor: processor_fuzzy_score(
+            processor, use_cases, target_budget, preferences["cpu_priority"]
+        ),
+        reverse=True,
+    )
+
+    for parts, total_price in candidate_builds(processors, preferences, max_budget):
+        if total_price > max_budget:
+            continue
+        score = calculate_build_score(parts, use_cases, total_price, min_budget, max_budget, preferences)
+        if total_price < min_budget:
+            score -= 20
+        if score > best_score:
+            best_score = score
+            best_build = {"parts": parts, "total_price": total_price}
 
     if best_build is None:
         best_build = find_cheapest_pc(preferences, max_budget)
@@ -234,28 +236,11 @@ def find_cheapest_pc(preferences, budget):
     backup_preferences["include_wifi"] = False
     cheapest = None
     cheapest_price = 10**9
-    for processor in products_in("Processor"):
-        for motherboard in products_in("Motherboard"):
-            for ram in products_in("RAM"):
-                if not product_allowed(ram, backup_preferences, budget):
-                    continue
-                for storage in products_in("ROM / Storage"):
-                    if not product_allowed(storage, backup_preferences, budget):
-                        continue
-                    for graphics_card in products_in("Graphics Card"):
-                        if not product_allowed(graphics_card, backup_preferences, budget):
-                            continue
-                        for power_supply in products_in("Power Supply"):
-                            for cabinet in products_in("Cabinet"):
-                                if not is_compatible(
-                                    processor, motherboard, ram, graphics_card, None, power_supply, cabinet
-                                ):
-                                    continue
-                                parts = [processor, motherboard, ram, storage, graphics_card, power_supply, cabinet]
-                                total_price = sum(price_of(part) for part in parts)
-                                if total_price < cheapest_price:
-                                    cheapest_price = total_price
-                                    cheapest = {"parts": parts, "total_price": total_price}
+
+    for parts, total_price in candidate_builds(products_in("Processor"), backup_preferences, budget):
+        if total_price < cheapest_price:
+            cheapest_price = total_price
+            cheapest = {"parts": parts, "total_price": total_price}
     return cheapest
 
 def replace_part(parts, category, new_part):
