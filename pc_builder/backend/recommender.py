@@ -1,8 +1,6 @@
 import re
-
 from pc_builder.backend.pricing import price_of
 from pc_builder.database.products import CATEGORIES, products_in
-
 
 def guess_use_cases(user_text):
     text = user_text.lower()
@@ -15,7 +13,6 @@ def guess_use_cases(user_text):
     if re.search("home|movie|browsing|school|family|daily", text):
         use_cases.append("home")
     return use_cases
-
 
 def guess_budget_range(user_text):
     text = user_text.lower().replace(",", "")
@@ -38,22 +35,18 @@ def guess_budget_range(user_text):
         return clean_budget(budget * 0.90), clean_budget(budget * 1.10)
     return None
 
-
 def clean_budget(amount):
     rounded = round(amount / 5000) * 5000
     return int(max(25000, min(250000, rounded)))
 
-
 def product_score(product, use_cases):
     return sum(product[use_case] for use_case in use_cases) / len(use_cases)
-
 
 def fuzzy_ratio(value, target):
     ratio = value / target
     if ratio >= 1:
         return min(1.25, ratio)
     return ratio
-
 
 def needed_processor_capability(use_cases, budget, cpu_priority):
     target = 60
@@ -71,14 +64,12 @@ def needed_processor_capability(use_cases, budget, cpu_priority):
         target = target - 8
     return min(100, max(45, target))
 
-
 def processor_fuzzy_score(processor, use_cases, budget, cpu_priority):
     target = needed_processor_capability(use_cases, budget, cpu_priority)
     capability_fit = fuzzy_ratio(processor["capability"], target) * 100
     task_fit = product_score(processor, use_cases)
     price_penalty = price_of(processor) / max(1, budget) * 45
     return capability_fit * 0.55 + task_fit * 0.45 - price_penalty
-
 
 def gpu_fuzzy_score(graphics_card, use_cases, budget, gpu_need):
     if gpu_need == "No dedicated GPU needed":
@@ -95,7 +86,6 @@ def gpu_fuzzy_score(graphics_card, use_cases, budget, gpu_need):
     task_fit = product_score(graphics_card, use_cases)
     price_penalty = price_of(graphics_card) / max(1, budget) * 35
     return speed_fit * 0.6 + task_fit * 0.4 - price_penalty
-
 
 def product_allowed(product, preferences, budget):
     category = product["category"]
@@ -119,7 +109,6 @@ def product_allowed(product, preferences, budget):
         return False
     return True
 
-
 def is_compatible(processor, motherboard, ram, graphics_card, wifi_card, power_supply, cabinet):
     if processor["socket"] != motherboard["socket"]:
         return False
@@ -132,13 +121,11 @@ def is_compatible(processor, motherboard, ram, graphics_card, wifi_card, power_s
     estimated_watts = processor["wattage"] + graphics_card["wattage"] + 110
     return power_supply["capacity"] >= estimated_watts * 1.35
 
-
 def find_part(parts, category):
     for part in parts:
         if part["category"] == category:
             return part
     return None
-
 
 def calculate_build_score(parts, use_cases, total_price, min_budget, max_budget, preferences):
     target_budget = (min_budget + max_budget) / 2
@@ -150,7 +137,6 @@ def calculate_build_score(parts, use_cases, total_price, min_budget, max_budget,
     power_supply = find_part(parts, "Power Supply")
     cabinet = find_part(parts, "Cabinet")
     wifi_card = find_part(parts, "Wi-Fi Card")
-
     score = sum(product_score(part, use_cases) for part in parts)
     score += processor_fuzzy_score(processor, use_cases, target_budget, preferences["cpu_priority"]) * 1.4
     score += gpu_fuzzy_score(graphics_card, use_cases, target_budget, preferences["gpu_need"]) * 1.2
@@ -173,7 +159,6 @@ def calculate_build_score(parts, use_cases, total_price, min_budget, max_budget,
         score += wifi_card["wifi_rank"] * 0.25
     return score
 
-
 def find_best_pc(use_cases, min_budget, max_budget, preferences):
     target_budget = (min_budget + max_budget) / 2
     best_build = None
@@ -185,7 +170,6 @@ def find_best_pc(use_cases, min_budget, max_budget, preferences):
         ),
         reverse=True,
     )
-
     for processor in processors:
         for motherboard in products_in("Motherboard"):
             for ram in products_in("RAM"):
@@ -244,7 +228,6 @@ def find_best_pc(use_cases, min_budget, max_budget, preferences):
     best_build["alternatives"] = find_alternatives(best_build, use_cases, max_budget, preferences)
     return best_build
 
-
 def find_cheapest_pc(preferences, budget):
     backup_preferences = preferences.copy()
     backup_preferences["gpu_need"] = "No dedicated GPU needed"
@@ -275,10 +258,8 @@ def find_cheapest_pc(preferences, budget):
                                     cheapest = {"parts": parts, "total_price": total_price}
     return cheapest
 
-
 def replace_part(parts, category, new_part):
     return [new_part if part["category"] == category else part for part in parts]
-
 
 def test_build_is_compatible(parts):
     return is_compatible(
@@ -290,7 +271,6 @@ def test_build_is_compatible(parts):
         find_part(parts, "Power Supply"),
         find_part(parts, "Cabinet"),
     )
-
 
 def find_alternatives(build, use_cases, budget, preferences):
     alternatives = {}
