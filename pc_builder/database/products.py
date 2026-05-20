@@ -9,7 +9,6 @@ CATEGORIES = [
     "Cabinet",
 ]
 
-
 PRODUCTS = [
     {
         "category": "Processor",
