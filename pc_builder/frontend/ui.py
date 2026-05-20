@@ -1,7 +1,5 @@
 from urllib.parse import quote_plus
-
 import streamlit as st
-
 from pc_builder.backend.pricing import price_range, rupees
 from pc_builder.backend.recommender import (
     find_best_pc,
@@ -13,7 +11,6 @@ from pc_builder.backend.recommender import (
 )
 from pc_builder.database.products import PRODUCTS
 from pc_builder.frontend.theme import apply_theme
-
 
 def image_url_for(part):
     search_words = {
@@ -29,7 +26,6 @@ def image_url_for(part):
     query = quote_plus(search_words.get(part["category"], part["name"]))
     return f"https://source.unsplash.com/700x420/?{query}"
 
-
 def search_link(site, product_name):
     query = quote_plus(product_name)
     links = {
@@ -40,7 +36,6 @@ def search_link(site, product_name):
     }
     return links[site]
 
-
 def show_part_card(part, alternatives):
     with st.container(border=True):
         st.subheader(part["category"])
@@ -48,7 +43,6 @@ def show_part_card(part, alternatives):
         st.write(f"**{part['name']}**")
         st.write(f"Estimated price range: {price_range(part)}")
         st.caption(part["details"])
-
         if part["category"] == "Processor":
             st.progress(part["capability"] / 100, text=f"Processor capability: {part['capability']}/100")
         if part["category"] == "Graphics Card":
@@ -71,7 +65,6 @@ def show_part_card(part, alternatives):
         with link_col4:
             st.link_button("Photos", search_link("Photos", part["name"]))
 
-
 def get_preferences(budget):
     st.subheader("Detailed requirements")
 
@@ -85,7 +78,6 @@ def get_preferences(budget):
         ["Balanced motherboard", "Save money on motherboard", "Premium motherboard"],
         horizontal=True,
     )
-
     if budget > 200000:
         st.info("Budget is above ₹2,00,000, so RAM is locked to 32GB.")
         ram_sizes = [32]
@@ -131,7 +123,6 @@ def get_preferences(budget):
             horizontal=True,
         ),
     }
-
 
 def run_app():
     st.set_page_config(page_title="PC Builder India", layout="wide")
